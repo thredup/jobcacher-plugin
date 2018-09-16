@@ -40,7 +40,9 @@ import jenkins.plugins.itemstorage.GlobalItemStorage;
 import jenkins.plugins.itemstorage.ItemStorage;
 import jenkins.plugins.itemstorage.ItemStorageDescriptor;
 import jenkins.plugins.itemstorage.Messages;
+import jenkins.plugins.itemstorage.StorageFormat;
 import org.kohsuke.stapler.DataBoundConstructor;
+import org.kohsuke.stapler.DataBoundSetter;
 import org.kohsuke.stapler.QueryParameter;
 
 import javax.annotation.Nonnull;
@@ -52,10 +54,12 @@ import java.util.List;
  *
  * @author Peter Hayes
  */
+@SuppressWarnings("unused")
 public class S3ItemStorage extends ItemStorage<S3ObjectPath> {
     private String credentialsId;
     private String bucketName;
     private String region;
+    private StorageFormat storageFormat = StorageFormat.DIRECTORY;
 
     @DataBoundConstructor
     public S3ItemStorage(String credentialsId, String bucketName, String region) {
@@ -79,11 +83,21 @@ public class S3ItemStorage extends ItemStorage<S3ObjectPath> {
         return credentialsId;
     }
 
+    @SuppressWarnings("unused")
+    public StorageFormat getStorageFormat() {
+        return storageFormat;
+    }
+
+    @DataBoundSetter
+    public void setStorageFormat(StorageFormat storageFormat) {
+        this.storageFormat = storageFormat;
+    }
+
     @Override
     public S3ObjectPath getObjectPath(Item item, String path) {
         S3Profile profile = new S3Profile(lookupCredentials(), 5, 5L);
 
-        return new S3ObjectPath(profile, bucketName, region, item.getFullName(), path);
+        return new S3ObjectPath(profile, bucketName, region, storageFormat, item.getFullName(), path);
     }
 
     private AmazonWebServicesCredentials lookupCredentials() {

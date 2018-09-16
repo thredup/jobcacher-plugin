@@ -28,11 +28,14 @@ import com.amazonaws.services.s3.model.ListObjectsRequest;
 import com.amazonaws.services.s3.model.ObjectListing;
 import com.amazonaws.services.s3.model.S3ObjectSummary;
 import com.amazonaws.services.s3.transfer.TransferManager;
+import hudson.FilePath;
 import hudson.remoting.VirtualChannel;
 import hudson.util.DirScanner;
+import jenkins.plugins.itemstorage.StorageFormat;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.logging.Logger;
 
 /**
  * Copies all objects from the path in S3 to the target base path
@@ -41,15 +44,25 @@ import java.io.IOException;
  */
 public class S3DownloadAllCallable extends S3Callable<Integer> {
     private static final long serialVersionUID = 1L;
-    private String bucketName;
-    private String pathPrefix;
+
+    private static final Logger LOG = Logger.getLogger(S3DownloadAllCallable.class.getName());
+
+    private final String bucketName;
+    private final String pathPrefix;
+    private final StorageFormat storageFormat;
     private final DirScanner.Glob scanner;
 
 
-    public S3DownloadAllCallable(ClientHelper helper, String fileMask, String excludes, String bucketName, String pathPrefix) {
+    public S3DownloadAllCallable(ClientHelper helper,
+                                 String fileMask,
+                                 String excludes,
+                                 String bucketName,
+                                 String pathPrefix,
+                                 StorageFormat storageFormat) {
         super(helper);
         this.bucketName = bucketName;
         this.pathPrefix = pathPrefix;
+        this.storageFormat = storageFormat;
 
         scanner = new DirScanner.Glob(fileMask, excludes);
     }
@@ -65,6 +78,17 @@ public class S3DownloadAllCallable extends S3Callable<Integer> {
             }
         }
 
+        switch (storageFormat) {
+            case DIRECTORY:
+                return downloadDirectory(transferManager, base);
+            case ZIP:
+                return downloadZip(transferManager, base);
+        }
+
+        throw new IllegalStateException("Unsupported storageFormat: " + storageFormat);
+    }
+
+    private int downloadDirectory(TransferManager transferManager, File base) throws IOException, InterruptedException {
         int totalCount;
         Downloads downloads = new Downloads();
         ObjectListing objectListing = null;
@@ -88,5 +112,20 @@ public class S3DownloadAllCallable extends S3Callable<Integer> {
         downloads.finishDownloading();
 
         return totalCount;
+    }
+
+    private int downloadZip(TransferManager transferManager, File base) throws IOException, InterruptedException {
+        File archive = File.createTempFile("upload", "zip");
+
+        String s3key = pathPrefix + "/archive.zip";
+        transferManager.download(bucketName, s3key, archive).waitForCompletion();
+
+        new FilePath(archive).unzip(new FilePath(base));
+        if (!archive.delete()) {
+            LOG.warning("Unable to delete temporary file " + archive);
+        }
+
+        // TODO: count files in the archive
+        return 0;
     }
 }

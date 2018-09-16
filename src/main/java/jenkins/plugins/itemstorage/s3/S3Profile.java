@@ -32,6 +32,7 @@ import com.cloudbees.jenkins.plugins.awscredentials.AmazonWebServicesCredentials
 import hudson.FilePath;
 import hudson.ProxyConfiguration;
 import jenkins.model.Jenkins;
+import jenkins.plugins.itemstorage.StorageFormat;
 import org.kohsuke.stapler.DataBoundConstructor;
 
 import java.io.IOException;
@@ -62,6 +63,7 @@ public class S3Profile {
                       final String path,
                       final String fileMask,
                       final String excludes,
+                      final StorageFormat storageFormat,
                       final FilePath source,
                       final Map<String, String> userMetadata,
                       final String storageClass,
@@ -72,6 +74,7 @@ public class S3Profile {
                 excludes,
                 bucketName,
                 path,
+                storageFormat,
                 userMetadata,
                 storageClass,
                 useServerSideEncryption);
@@ -85,8 +88,19 @@ public class S3Profile {
         return !objectListing.getObjectSummaries().isEmpty();
     }
 
-    public int download(String bucketName, String pathPrefix, String fileMask, String excludes, FilePath target) throws IOException, InterruptedException {
-        FilePath.FileCallable<Integer> download = new S3DownloadAllCallable(helper, fileMask, excludes, bucketName, pathPrefix);
+    public int download(String bucketName,
+                        String pathPrefix,
+                        String fileMask,
+                        String excludes,
+                        StorageFormat storageFormat,
+                        FilePath target) throws IOException, InterruptedException {
+        FilePath.FileCallable<Integer> download = new S3DownloadAllCallable(
+                helper,
+                fileMask,
+                excludes,
+                bucketName,
+                pathPrefix,
+                storageFormat);
 
         return target.act(download);
     }

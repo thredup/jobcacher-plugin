@@ -38,4 +38,10 @@
         <f:select />
     </f:entry>
 
+    <f:entry title="${%Storage Format}" field="storageFormat">
+        <f:enum field="storageFormat">
+            ${it.name()}
+        </f:enum>
+    </f:entry>
+
 </j:jelly>

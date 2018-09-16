@@ -27,10 +27,10 @@ package jenkins.plugins.itemstorage.s3;
 import hudson.FilePath;
 import hudson.model.Job;
 import jenkins.plugins.itemstorage.ObjectPath;
+import jenkins.plugins.itemstorage.StorageFormat;
 import org.kohsuke.stapler.HttpResponse;
 import org.kohsuke.stapler.StaplerRequest;
 import org.kohsuke.stapler.StaplerResponse;
-import org.kohsuke.stapler.jelly.RedirectTag;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -44,39 +44,59 @@ public class S3ObjectPath extends ObjectPath {
     private final S3Profile profile;
     private final String bucketName;
     private final String region;
+    private final StorageFormat storageFormat;
     private final String fullName;
     private final String path;
 
-    public S3ObjectPath(S3Profile profile, String bucketName, String region, String fullName, String path) {
+    public S3ObjectPath(S3Profile profile,
+                        String bucketName,
+                        String region,
+                        StorageFormat storageFormat,
+                        String fullName,
+                        String path) {
         this.profile = profile;
         this.bucketName = bucketName;
         this.region = region;
+        this.storageFormat = storageFormat;
         this.fullName = fullName;
         this.path = path;
     }
 
     @Override
-    public S3ObjectPath child(String childPath) throws IOException, InterruptedException {
-        return new S3ObjectPath(profile, bucketName, region, fullName, path + "/" + childPath);
+    public S3ObjectPath child(String childPath) {
+        return new S3ObjectPath(profile, bucketName, region, storageFormat, fullName, path + "/" + childPath);
     }
 
     @Override
     public int copyRecursiveTo(String fileMask, String excludes, FilePath target) throws IOException, InterruptedException {
-        return profile.download(bucketName, fullName + "/" + path, fileMask, excludes, target);
+        return profile.download(bucketName,
+                                fullName + "/" + path,
+                                fileMask,
+                                excludes,
+                                storageFormat,
+                                target);
     }
 
     @Override
     public int copyRecursiveFrom(String fileMask, String excludes, FilePath source) throws IOException, InterruptedException {
-        return profile.upload(bucketName, fullName + "/" + path, fileMask, excludes, source, Collections.EMPTY_MAP, null, false);
+        return profile.upload(bucketName,
+                              fullName + "/" + path,
+                              fileMask,
+                              excludes,
+                              storageFormat,
+                              source,
+                              Collections.emptyMap(),
+                              null,
+                              false);
     }
 
     @Override
-    public boolean exists() throws IOException, InterruptedException {
+    public boolean exists() {
         return profile.exists(bucketName, fullName + "/" + path);
     }
 
     @Override
-    public void deleteRecursive() throws IOException, InterruptedException {
+    public void deleteRecursive() {
         profile.delete(bucketName, fullName + "/" + path);
     }
 

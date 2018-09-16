@@ -29,32 +29,49 @@ import com.amazonaws.services.s3.model.ObjectListing;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.S3ObjectSummary;
 import com.amazonaws.services.s3.transfer.TransferManager;
+import hudson.FilePath;
 import hudson.remoting.VirtualChannel;
 import hudson.util.DirScanner;
 import hudson.util.FileVisitor;
+import jenkins.plugins.itemstorage.StorageFormat;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.logging.Logger;
 
 /**
  * Created by hayep on 12/2/2016.
  */
 public class S3UploadAllCallable extends S3BaseUploadCallable<Integer> {
     private static final long serialVersionUID = 1L;
-    private String bucketName;
-    private String pathPrefix;
+
+    private static final Logger LOG = Logger.getLogger(S3UploadAllCallable.class.getName());
+
+    private final String bucketName;
+    private final String pathPrefix;
+    private final StorageFormat storageFormat;
     private final DirScanner.Glob scanner;
 
 
-    public S3UploadAllCallable(ClientHelper clientHelper, String fileMask, String excludes, String bucketName, String pathPrefix, Map<String, String> userMetadata, String storageClass, boolean useServerSideEncryption) {
+    public S3UploadAllCallable(ClientHelper clientHelper,
+                               String fileMask,
+                               String excludes,
+                               String bucketName,
+                               String pathPrefix,
+                               StorageFormat storageFormat,
+                               Map<String, String> userMetadata,
+                               String storageClass,
+                               boolean useServerSideEncryption) {
         super(clientHelper, userMetadata, storageClass, useServerSideEncryption);
         this.bucketName = bucketName;
         this.pathPrefix = pathPrefix;
+        this.storageFormat = storageFormat;
 
         scanner = new DirScanner.Glob(fileMask, excludes);
     }
@@ -63,9 +80,23 @@ public class S3UploadAllCallable extends S3BaseUploadCallable<Integer> {
      * Upload from slave
      */
     @Override
-    public Integer invoke(final TransferManager transferManager, File base, VirtualChannel channel) throws IOException, InterruptedException {
-        if(!base.exists())  return 0;
+    public Integer invoke(final TransferManager transferManager, File base, VirtualChannel channel) throws IOException,
+            InterruptedException {
+        if(!base.exists()) {
+            return 0;
+        }
 
+        switch (storageFormat) {
+            case DIRECTORY:
+                return uploadAsDirectory(transferManager, base);
+            case ZIP:
+                return uploadAsZip(transferManager, base);
+        }
+
+        throw new IllegalStateException("Unsupported storageFormat: " + storageFormat);
+    }
+
+    private int uploadAsDirectory(TransferManager transferManager, File base) throws IOException {
         final AtomicInteger count = new AtomicInteger(0);
         final Uploads uploads = new Uploads();
 
@@ -96,6 +127,30 @@ public class S3UploadAllCallable extends S3BaseUploadCallable<Integer> {
         waitForUploads(count, uploads);
 
         return uploads.count();
+    }
+
+    private int uploadAsZip(TransferManager transferManager, File base) throws IOException, InterruptedException {
+        File archive = File.createTempFile("upload", "zip");
+        try (OutputStream outputStream = new FilePath(archive).write()) {
+            new FilePath(base).zip(outputStream, scanner);
+        }
+
+        Uploads uploads = new Uploads();
+        String s3key = pathPrefix + "/archive.zip";
+        ObjectMetadata metadata = buildMetadata(archive);
+        uploads.startUploading(transferManager,
+                               archive,
+                               IOUtils.toBufferedInputStream(FileUtils.openInputStream(archive)),
+                               new Destination(bucketName, s3key),
+                               metadata);
+        waitForUploads(new AtomicInteger(), uploads);
+
+        if (!archive.delete()) {
+            LOG.warning("Unable to delete temporary file " + archive);
+        }
+
+        // TODO: count matched files
+        return 0;
     }
 
     private Map<String,S3ObjectSummary> lookupExistingCacheEntries(AmazonS3 s3) {

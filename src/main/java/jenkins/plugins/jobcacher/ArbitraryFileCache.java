@@ -34,6 +34,7 @@ import hudson.model.TaskListener;
 import jenkins.plugins.itemstorage.GlobalItemStorage;
 import jenkins.plugins.itemstorage.ObjectPath;
 import org.apache.commons.lang.StringUtils;
+import org.jenkinsci.Symbol;
 import org.kohsuke.stapler.*;
 
 import javax.annotation.Nonnull;
@@ -133,6 +134,7 @@ public class ArbitraryFileCache extends Cache {
         }
     }
 
+    @SuppressWarnings("unused")
     public HttpResponse doDynamic(StaplerRequest req, StaplerResponse rsp, @AncestorInPath Job job) throws IOException, ServletException, InterruptedException {
 
         ObjectPath cache = CacheManager.getCachePath(GlobalItemStorage.get().getStorage(), job).child(deriveCachePath(path));
@@ -146,6 +148,7 @@ public class ArbitraryFileCache extends Cache {
     }
 
     @Extension
+    @Symbol("arbitraryFile")
     public static final class DescriptorImpl extends CacheDescriptor {
         @Nonnull
         @Override

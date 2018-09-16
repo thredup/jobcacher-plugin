@@ -26,6 +26,9 @@ public class CacheManager {
     private static Map<String, Object> locks = new HashMap<>();
 
     public static ObjectPath getCachePath(ItemStorage storage, Job<?, ?> job) {
+        // TODO: share cache across different branches of multibranch project
+        // TODO: e.g. if job's parent() is MultiBranchProject then use it instead job for object path
+        LOG.info(String.format("getCachePath(%s, %s)", storage, job));
         return storage.getObjectPath(job, "cache");
     }
 
@@ -53,6 +56,7 @@ public class CacheManager {
 
         // Lock the cache for reading - would be nice to make it more fine grain for multiple readers of cache
         List<Cache.Saver> cacheSavers = new ArrayList<>();
+        // TODO: do we need locks here?
         synchronized (getLock(run.getParent())) {
             for (Cache cache : caches) {
                 cacheSavers.add(cache.cache(cachePath, run, workspace, launcher, listener, initialEnvironment));

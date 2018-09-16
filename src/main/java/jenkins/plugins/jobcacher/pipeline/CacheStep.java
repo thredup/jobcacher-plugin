@@ -50,6 +50,7 @@ import java.util.List;
  * Wrapping workflow step that automatically seeds the specified path with the previous run and on exit of the
  * block, saves that cache to the configured item storage.
  */
+@SuppressWarnings("unused")
 public class CacheStep extends AbstractStepImpl {
     private long maxCacheSize = 0L;
     private List<Cache> caches = new ArrayList<>();
@@ -89,7 +90,11 @@ public class CacheStep extends AbstractStepImpl {
             TaskListener listener = context.get(TaskListener.class);
             EnvVars initialEnvironment = context.get(EnvVars.class);
 
+            listener.getLogger().println("Going to download cache...");
+
             List<Cache.Saver> cacheSavers = CacheManager.cache(GlobalItemStorage.get().getStorage(), run, workspace, launcher, listener, initialEnvironment, cacheStep.caches);
+
+            listener.getLogger().println("Cache downloaded");
 
             context.newBodyInvoker().
                     withContext(context).
@@ -152,7 +157,11 @@ public class CacheStep extends AbstractStepImpl {
             Launcher launcher = context.get(Launcher.class);
             TaskListener listener = context.get(TaskListener.class);
 
+            listener.getLogger().println("Going to upload cache...");
+
             CacheManager.save(GlobalItemStorage.get().getStorage(), run, workspace, launcher, listener, maxCacheSize, caches, cacheSavers);
+
+            listener.getLogger().println("Cache uploaded");
         }
     }
 

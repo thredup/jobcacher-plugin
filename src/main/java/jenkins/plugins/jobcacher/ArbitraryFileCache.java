@@ -38,6 +38,7 @@ import org.jenkinsci.Symbol;
 import org.kohsuke.stapler.*;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import javax.servlet.ServletException;
 import java.io.IOException;
 import java.util.logging.Logger;
@@ -50,7 +51,7 @@ import java.util.logging.Logger;
  * @author Peter Hayes
  */
 public class ArbitraryFileCache extends Cache {
-    private static Logger LOGGER = Logger.getLogger(ArbitraryFileCache.class.getName());
+    private static final Logger logger = Logger.getLogger(ArbitraryFileCache.class.getName());
 
     private static final long serialVersionUID = 1L;
 
@@ -97,7 +98,7 @@ public class ArbitraryFileCache extends Cache {
     @Override
     public Saver cache(ObjectPath cache, Run<?, ?> build, FilePath workspace, Launcher launcher, TaskListener listener, EnvVars initialEnvironment) throws IOException, InterruptedException {
         // Get a source dir for cached files for this path
-        ObjectPath source = cache.child(deriveCachePath(path));
+        ObjectPath source = resolveCachePath(cache, workspace, path);
 
         // Resolve path variables if any
         String expandedPath = initialEnvironment.expand(path);
@@ -105,6 +106,12 @@ public class ArbitraryFileCache extends Cache {
         cachePath(source, workspace, listener, expandedPath, includes, excludes);
 
         return new SaverImpl(expandedPath);
+    }
+
+    protected ObjectPath resolveCachePath(ObjectPath cache, @Nullable FilePath workspace, String path)
+            throws IOException, InterruptedException {
+        logger.info(">>> resolveCachePath(" + cache + ", " + workspace + ", " + path + ")");
+        return cache.child(deriveCachePath(path));
     }
 
     private class SaverImpl extends Saver {
@@ -119,6 +126,8 @@ public class ArbitraryFileCache extends Cache {
 
         @Override
         public long calculateSize(ObjectPath objectPath, Run<?, ?> build, FilePath workspace, Launcher launcher, TaskListener listener) throws IOException, InterruptedException {
+            logger.info(">>> calculateSize(" + objectPath + ", " + build + ", " + workspace + ", " + launcher +
+                        ", " + listener + ")");
             // Locate the cache on the master node
             FilePath targetDirectory = workspace.child(path);
 
@@ -128,7 +137,7 @@ public class ArbitraryFileCache extends Cache {
         @Override
         public void save(ObjectPath cache, Run<?, ?> build, FilePath workspace, Launcher launcher, TaskListener listener) throws IOException, InterruptedException {
             // Get a target dir for cached files for this path
-            ObjectPath target = cache.child(deriveCachePath(path));
+            ObjectPath target = resolveCachePath(cache, workspace, path);
 
             savePath(target, workspace, listener, expandedPath, includes, excludes);
         }
@@ -136,8 +145,8 @@ public class ArbitraryFileCache extends Cache {
 
     @SuppressWarnings("unused")
     public HttpResponse doDynamic(StaplerRequest req, StaplerResponse rsp, @AncestorInPath Job job) throws IOException, ServletException, InterruptedException {
-
-        ObjectPath cache = CacheManager.getCachePath(GlobalItemStorage.get().getStorage(), job).child(deriveCachePath(path));
+        ObjectPath cachePath = CacheManager.getCachePath(GlobalItemStorage.get().getStorage(), job);
+        ObjectPath cache = resolveCachePath(cachePath, null, path);
 
         if (!cache.exists()) {
             req.getView(this,"noCache.jelly").forward(req,rsp);

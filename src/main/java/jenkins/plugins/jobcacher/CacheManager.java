@@ -20,7 +20,7 @@ import java.util.logging.Logger;
  * @author Peter Hayes
  */
 public class CacheManager {
-    private static final Logger LOG = Logger.getLogger(CacheManager.class.getName());
+    private static final Logger logger = Logger.getLogger(CacheManager.class.getName());
 
     // Could potential grow indefinitely as jobs are created and destroyed
     private static Map<String, Object> locks = new HashMap<>();
@@ -28,7 +28,7 @@ public class CacheManager {
     public static ObjectPath getCachePath(ItemStorage storage, Job<?, ?> job) {
         // TODO: share cache across different branches of multibranch project
         // TODO: e.g. if job's parent() is MultiBranchProject then use it instead job for object path
-        LOG.info(String.format("getCachePath(%s, %s)", storage, job));
+        logger.info(String.format(">> getCachePath(%s, %s)", storage, job.getFullName()));
         return storage.getObjectPath(job, "cache");
     }
 
@@ -52,16 +52,16 @@ public class CacheManager {
     public static List<Cache.Saver> cache(ItemStorage storage, Run run, FilePath workspace, Launcher launcher, TaskListener listener, EnvVars initialEnvironment, List<Cache> caches) throws IOException, InterruptedException {
         ObjectPath cachePath = getCachePath(storage, run);
 
-        LOG.fine("Preparing cache for build " + run);
+        logger.fine("Preparing cache for build " + run);
 
         // Lock the cache for reading - would be nice to make it more fine grain for multiple readers of cache
         List<Cache.Saver> cacheSavers = new ArrayList<>();
         // TODO: do we need locks here?
-        synchronized (getLock(run.getParent())) {
+//        synchronized (getLock(run.getParent())) {
             for (Cache cache : caches) {
                 cacheSavers.add(cache.cache(cachePath, run, workspace, launcher, listener, initialEnvironment));
             }
-        }
+//        }
         return cacheSavers;
     }
 
@@ -78,7 +78,8 @@ public class CacheManager {
         }
 
         // synchronize on the build's parent object as we are going to write to the shared cache
-        synchronized (getLock(run.getParent())) {
+        // TODO: synchronization might not be needed for single-file ZIP cache format
+//        synchronized (getLock(run.getParent())) {
 
             // If total size is greater than configured maximum, delete all caches to start fresh next build
             if (totalSize > maxCacheSize * 1024 * 1024) {
@@ -93,12 +94,12 @@ public class CacheManager {
                 }
             } else {
                 // Otherwise, request each cache to save itself for the next build
-                LOG.fine("Saving cache for build " + run);
+                logger.info(">>> Saving cache for build " + run);
                 for (Cache.Saver saver : cacheSavers) {
                     saver.save(cachePath, run, workspace, launcher, listener);
                 }
             }
-        }
+//        }
 
         // Add a build action so that users can navigate the cache stored on master through UI
         run.addAction(new CacheBuildLastAction(caches));

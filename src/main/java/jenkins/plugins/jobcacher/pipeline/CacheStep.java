@@ -45,6 +45,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.logging.Logger;
 
 /**
  * Wrapping workflow step that automatically seeds the specified path with the previous run and on exit of the
@@ -74,6 +75,8 @@ public class CacheStep extends AbstractStepImpl {
 
         private static final long serialVersionUID = 1L;
 
+        private static final Logger logger = Logger.getLogger(ExecutionImpl.class.getName());
+
         @Inject(optional = true)
         private transient CacheStep cacheStep = null;
 
@@ -91,9 +94,12 @@ public class CacheStep extends AbstractStepImpl {
             EnvVars initialEnvironment = context.get(EnvVars.class);
 
             listener.getLogger().println("Going to download cache...");
+            logger.info(">>> Staring cache download");
+            logger.info(">>> " + cacheStep.caches.size() + " caches to populate");
 
             List<Cache.Saver> cacheSavers = CacheManager.cache(GlobalItemStorage.get().getStorage(), run, workspace, launcher, listener, initialEnvironment, cacheStep.caches);
 
+            logger.info(">>> Cache download competed");
             listener.getLogger().println("Cache downloaded");
 
             context.newBodyInvoker().
@@ -110,12 +116,16 @@ public class CacheStep extends AbstractStepImpl {
         @Override
         public void stop(@Nonnull Throwable cause) throws Exception {
             // If someone canceled the run, just propagate the failure and do not attempt to cache
+            logger.info(">>> Force stop");
+
             getContext().onFailure(cause);
         }
     }
 
     public static class ExecutionCallback extends BodyExecutionCallback {
         private static final long serialVersionUID = 1L;
+
+        private static final Logger logger = Logger.getLogger(ExecutionCallback.class.getName());
 
         private long maxCacheSize;
         private List<Cache> caches;
@@ -143,8 +153,8 @@ public class CacheStep extends AbstractStepImpl {
             try {
                 // attempt to save the caches even though we failed
                 complete(context);
-            } catch (Throwable ignored) {
-                // ignore error as we are failed anyways
+            } catch (Throwable e) {
+                t.addSuppressed(e);
             }
 
             context.onFailure(t);
@@ -158,9 +168,12 @@ public class CacheStep extends AbstractStepImpl {
             TaskListener listener = context.get(TaskListener.class);
 
             listener.getLogger().println("Going to upload cache...");
+            logger.info(">>> Staring cache upload");
+            logger.info(">>> " + cacheSavers.size() + " caches to upload");
 
             CacheManager.save(GlobalItemStorage.get().getStorage(), run, workspace, launcher, listener, maxCacheSize, caches, cacheSavers);
 
+            logger.info(">>> Cache upload complete");
             listener.getLogger().println("Cache uploaded");
         }
     }

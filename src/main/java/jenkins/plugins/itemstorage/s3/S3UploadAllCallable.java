@@ -51,7 +51,7 @@ import java.util.logging.Logger;
 public class S3UploadAllCallable extends S3BaseUploadCallable<Integer> {
     private static final long serialVersionUID = 1L;
 
-    private static final Logger LOG = Logger.getLogger(S3UploadAllCallable.class.getName());
+    private static final Logger logger = Logger.getLogger(S3UploadAllCallable.class.getName());
 
     private final String bucketName;
     private final String pathPrefix;
@@ -69,6 +69,7 @@ public class S3UploadAllCallable extends S3BaseUploadCallable<Integer> {
                                String storageClass,
                                boolean useServerSideEncryption) {
         super(clientHelper, userMetadata, storageClass, useServerSideEncryption);
+        logger.info(">>> new S3UploadAllCallable()");
         this.bucketName = bucketName;
         this.pathPrefix = pathPrefix;
         this.storageFormat = storageFormat;
@@ -82,7 +83,9 @@ public class S3UploadAllCallable extends S3BaseUploadCallable<Integer> {
     @Override
     public Integer invoke(final TransferManager transferManager, File base, VirtualChannel channel) throws IOException,
             InterruptedException {
+        logger.info(">>> invoke()");
         if(!base.exists()) {
+            logger.warning(">>> Nothing to cache at " + base.getPath());
             return 0;
         }
 
@@ -100,6 +103,7 @@ public class S3UploadAllCallable extends S3BaseUploadCallable<Integer> {
         final AtomicInteger count = new AtomicInteger(0);
         final Uploads uploads = new Uploads();
 
+        logger.info(">>> Querying S3 for existing objects at s3://" + bucketName + "/" + pathPrefix);
         final Map<String, S3ObjectSummary> summaries = lookupExistingCacheEntries(transferManager.getAmazonS3Client());
 
         // Find files to upload that match scan
@@ -113,11 +117,15 @@ public class S3UploadAllCallable extends S3BaseUploadCallable<Integer> {
                     if (summary == null || f.lastModified() > summary.getLastModified().getTime()) {
                         final ObjectMetadata metadata = buildMetadata(f);
 
+                        logger.info(">>> Uploading file " + f + " to s3://" + bucketName + "/" + key);
                         uploads.startUploading(transferManager, f, IOUtils.toBufferedInputStream(FileUtils.openInputStream(f)), new Destination(bucketName, key), metadata);
 
                         if (uploads.count() > 20) {
                             waitForUploads(count, uploads);
                         }
+                    }
+                    else {
+                        logger.info(">>> Skipping upload of " + f + " to s3://" + bucketName + "/" + key);
                     }
                 }
             }
@@ -146,7 +154,7 @@ public class S3UploadAllCallable extends S3BaseUploadCallable<Integer> {
         waitForUploads(new AtomicInteger(), uploads);
 
         if (!archive.delete()) {
-            LOG.warning("Unable to delete temporary file " + archive);
+            logger.warning("Unable to delete temporary file " + archive);
         }
 
         // TODO: count matched files
@@ -171,7 +179,9 @@ public class S3UploadAllCallable extends S3BaseUploadCallable<Integer> {
         count.addAndGet(uploads.count());
 
         try {
+            logger.info(">>> Waiting for " + uploads.count() + " uploads");
             uploads.finishUploading();
+            logger.info(">>> " + uploads.count() + " uploads are complete");
         } catch (InterruptedException ie) {
             // clean up and bomb out
             uploads.cleanup();

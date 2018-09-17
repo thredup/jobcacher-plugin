@@ -100,6 +100,16 @@ public class S3ItemStorage extends ItemStorage<S3ObjectPath> {
         return new S3ObjectPath(profile, bucketName, region, storageFormat, item.getFullName(), path);
     }
 
+    @Override
+    public String toString() {
+        return "S3ItemStorage{" +
+               "credentialsId='" + credentialsId + '\'' +
+               ", bucketName='" + bucketName + '\'' +
+               ", region='" + region + '\'' +
+               ", storageFormat=" + storageFormat +
+               '}';
+    }
+
     private AmazonWebServicesCredentials lookupCredentials() {
         return (credentialsId == null) ? null : CredentialsMatchers.firstOrNull(
                 possibleCredentials(),

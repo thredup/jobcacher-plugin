@@ -106,4 +106,13 @@ public class S3ObjectPath extends ObjectPath {
         response.sendRedirect2("https://console.aws.amazon.com/s3/home?region=" + region + "#&bucket=" + bucketName + "&prefix=" + fullName + "/" + path + "/");
         return null;
     }
+
+    @Override
+    public String toString() {
+        return "S3ObjectPath{" +
+                "bucketName='" + bucketName + '\'' +
+                ", region='" + region + '\'' +
+                ", storageFormat=" + storageFormat +
+                '}';
+    }
 }

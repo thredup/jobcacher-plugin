@@ -146,10 +146,14 @@ public class S3UploadAllCallable extends S3BaseUploadCallable<Integer> {
         Uploads uploads = new Uploads();
         String s3key = pathPrefix + "/archive.zip";
         ObjectMetadata metadata = buildMetadata(archive);
+        Destination destination = new Destination(bucketName, s3key);
+
+        logger.fine(">>> "+destination);
+
         uploads.startUploading(transferManager,
                                archive,
                                IOUtils.toBufferedInputStream(FileUtils.openInputStream(archive)),
-                               new Destination(bucketName, s3key),
+                               destination,
                                metadata);
         waitForUploads(new AtomicInteger(), uploads);
 

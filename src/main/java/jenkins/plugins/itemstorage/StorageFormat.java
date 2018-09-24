@@ -11,6 +11,13 @@ public enum StorageFormat {
 
     /**
      * Cache is stored as a single ZIP file, archived before upload storing and unarchived after download.
+     * NOTE: Symlinks archive/unarchive support isn't implemented for this format.
      */
-    ZIP
+    ZIP,
+
+    /**
+     * Cache is stored as a single TAR file, archived before upload storing and unarchived after download.
+     * NOTE: This format preserves and restores symlinks.
+     */
+    TAR
 }

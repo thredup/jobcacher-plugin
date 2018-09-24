@@ -92,8 +92,8 @@ public class S3UploadAllCallable extends S3BaseUploadCallable<Integer> {
         switch (storageFormat) {
             case DIRECTORY:
                 return uploadAsDirectory(transferManager, base);
-            case ZIP:
-                return uploadAsZip(transferManager, base);
+            case ZIP: case TAR:
+                return uploadAsArchive(transferManager, base, storageFormat);
         }
 
         throw new IllegalStateException("Unsupported storageFormat: " + storageFormat);
@@ -137,10 +137,14 @@ public class S3UploadAllCallable extends S3BaseUploadCallable<Integer> {
         return uploads.count();
     }
 
-    private int uploadAsZip(TransferManager transferManager, File base) throws IOException, InterruptedException {
-        File archive = File.createTempFile("upload", "zip");
+    private int uploadAsArchive(TransferManager transferManager, File base, StorageFormat format) throws IOException, InterruptedException {
+        File archive = File.createTempFile("upload", "archive");
         try (OutputStream outputStream = new FilePath(archive).write()) {
-            new FilePath(base).zip(outputStream, scanner);
+            FilePath filePath = new FilePath(base);
+            switch (format) {
+                case ZIP: filePath.zip(outputStream, scanner); break;
+                case TAR: filePath.tar(outputStream, scanner); break;
+            }
         }
 
         Uploads uploads = new Uploads();
@@ -148,7 +152,7 @@ public class S3UploadAllCallable extends S3BaseUploadCallable<Integer> {
         ObjectMetadata metadata = buildMetadata(archive);
         Destination destination = new Destination(bucketName, s3key);
 
-        logger.fine(">>> "+destination);
+        logger.fine(">>> " + destination);
 
         uploads.startUploading(transferManager,
                                archive,

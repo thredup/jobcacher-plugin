@@ -81,8 +81,8 @@ public class S3DownloadAllCallable extends S3Callable<Integer> {
         switch (storageFormat) {
             case DIRECTORY:
                 return downloadDirectory(transferManager, base);
-            case ZIP:
-                return downloadZip(transferManager, base);
+            case ZIP: case TAR:
+                return downloadArchive(transferManager, base, storageFormat);
         }
 
         throw new IllegalStateException("Unsupported storageFormat: " + storageFormat);
@@ -114,13 +114,19 @@ public class S3DownloadAllCallable extends S3Callable<Integer> {
         return totalCount;
     }
 
-    private int downloadZip(TransferManager transferManager, File base) throws IOException, InterruptedException {
-        File archive = File.createTempFile("upload", "zip");
+    private int downloadArchive(TransferManager transferManager, File base, StorageFormat storageFormat) throws IOException, InterruptedException {
+        File archive = File.createTempFile("upload", "archive");
 
         String s3key = pathPrefix + "/archive.zip";
         transferManager.download(bucketName, s3key, archive).waitForCompletion();
 
-        new FilePath(archive).unzip(new FilePath(base));
+        FilePath archiveFilePath = new FilePath(archive);
+        FilePath baseFilePath = new FilePath(base);
+        switch (storageFormat) {
+            case ZIP: archiveFilePath.unzip(baseFilePath); break;
+            case TAR: archiveFilePath.untar(baseFilePath, FilePath.TarCompression.NONE); break;
+        }
+
         if (!archive.delete()) {
             LOG.warning("Unable to delete temporary file " + archive);
         }

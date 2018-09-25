@@ -138,17 +138,28 @@ public class S3UploadAllCallable extends S3BaseUploadCallable<Integer> {
     }
 
     private int uploadAsArchive(TransferManager transferManager, File base, StorageFormat format) throws IOException, InterruptedException {
+
         File archive = File.createTempFile("upload", "archive");
+        String archiveExt;
         try (OutputStream outputStream = new FilePath(archive).write()) {
             FilePath filePath = new FilePath(base);
             switch (format) {
-                case ZIP: filePath.zip(outputStream, scanner); break;
-                case TAR: filePath.tar(outputStream, scanner); break;
+                case ZIP:
+                    filePath.zip(outputStream, scanner);
+                    archiveExt = "zip";
+                    break;
+                case TAR:
+                    filePath.tar(outputStream, scanner);
+                    archiveExt = "tar";
+                    break;
+                default:
+                    throw new IllegalStateException("Unsupported archive format: " + format);
             }
         }
 
         Uploads uploads = new Uploads();
-        String s3key = pathPrefix + "/archive.zip";
+
+        String s3key = pathPrefix + "/archive." + archiveExt;
         ObjectMetadata metadata = buildMetadata(archive);
         Destination destination = new Destination(bucketName, s3key);
 

@@ -2,14 +2,24 @@ package jenkins.plugins.jobcacher;
 
 import hudson.Extension;
 import hudson.FilePath;
+import hudson.Util;
+import hudson.remoting.VirtualChannel;
+import jenkins.SlaveToMasterFileCallable;
 import jenkins.plugins.itemstorage.ObjectPath;
+import org.apache.commons.io.FilenameUtils;
 import org.jenkinsci.Symbol;
 import org.kohsuke.stapler.DataBoundConstructor;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.List;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 @SuppressWarnings("unused")
 public class DependencyCache extends ArbitraryFileCache {
@@ -34,7 +44,22 @@ public class DependencyCache extends ArbitraryFileCache {
 
         FilePath dependencyDescriptorFile = workspace.child(dependencyDescriptor);
         logger.info(">>> Going to compute dependency descriptor digest for " + dependencyDescriptorFile);
-        String dependencyDigest = dependencyDescriptorFile.digest();
+        String dependencyDigest = dependencyDescriptorFile.act(
+            new SlaveToMasterFileCallable<String>() {
+                @Override
+                public String invoke(File file, VirtualChannel channel) throws IOException, InterruptedException {
+                    Path pathToFile = file.toPath();
+                    String fileType = Files.probeContentType(pathToFile);
+                    String fileExt = FilenameUtils.getExtension(file.getPath());
+                    List<String> textTypeExts = Arrays.asList(".json",".lock",".xml");
+                    boolean isBin =
+                            (fileType == null) || !fileType.startsWith("text") || !textTypeExts.contains(fileExt);
+                    return isBin ?
+                            Util.getDigestOf(file) :
+                            Util.getDigestOf(Files.lines(file.toPath()).collect(Collectors.joining("\n")));
+                }
+            }
+        );
         logger.info(">>> Digest is " + dependencyDigest);
         return parentCachePath.child(dependencyDigest);
     }

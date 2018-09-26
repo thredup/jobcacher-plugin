@@ -92,8 +92,8 @@ public class S3UploadAllCallable extends S3BaseUploadCallable<Integer> {
         switch (storageFormat) {
             case DIRECTORY:
                 return uploadAsDirectory(transferManager, base);
-            case ZIP:
-                return uploadAsZip(transferManager, base);
+            case ZIP: case TAR:
+                return uploadAsArchive(transferManager, base, storageFormat);
         }
 
         throw new IllegalStateException("Unsupported storageFormat: " + storageFormat);
@@ -137,18 +137,33 @@ public class S3UploadAllCallable extends S3BaseUploadCallable<Integer> {
         return uploads.count();
     }
 
-    private int uploadAsZip(TransferManager transferManager, File base) throws IOException, InterruptedException {
-        File archive = File.createTempFile("upload", "zip");
+    private int uploadAsArchive(TransferManager transferManager, File base, StorageFormat format) throws IOException, InterruptedException {
+
+        File archive = File.createTempFile("upload", "archive");
+        String archiveExt;
         try (OutputStream outputStream = new FilePath(archive).write()) {
-            new FilePath(base).zip(outputStream, scanner);
+            FilePath filePath = new FilePath(base);
+            switch (format) {
+                case ZIP:
+                    filePath.zip(outputStream, scanner);
+                    archiveExt = "zip";
+                    break;
+                case TAR:
+                    filePath.tar(outputStream, scanner);
+                    archiveExt = "tar";
+                    break;
+                default:
+                    throw new IllegalStateException("Unsupported archive format: " + format);
+            }
         }
 
         Uploads uploads = new Uploads();
-        String s3key = pathPrefix + "/archive.zip";
+
+        String s3key = pathPrefix + "/archive." + archiveExt;
         ObjectMetadata metadata = buildMetadata(archive);
         Destination destination = new Destination(bucketName, s3key);
 
-        logger.fine(">>> "+destination);
+        logger.fine(">>> " + destination);
 
         uploads.startUploading(transferManager,
                                archive,

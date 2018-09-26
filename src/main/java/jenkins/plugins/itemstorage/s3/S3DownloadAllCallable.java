@@ -37,6 +37,8 @@ import java.io.File;
 import java.io.IOException;
 import java.util.logging.Logger;
 
+import static jenkins.plugins.itemstorage.StorageFormat.ZIP;
+
 /**
  * Copies all objects from the path in S3 to the target base path
  *
@@ -81,8 +83,8 @@ public class S3DownloadAllCallable extends S3Callable<Integer> {
         switch (storageFormat) {
             case DIRECTORY:
                 return downloadDirectory(transferManager, base);
-            case ZIP:
-                return downloadZip(transferManager, base);
+            case ZIP: case TAR:
+                return downloadArchive(transferManager, base, storageFormat);
         }
 
         throw new IllegalStateException("Unsupported storageFormat: " + storageFormat);
@@ -114,13 +116,26 @@ public class S3DownloadAllCallable extends S3Callable<Integer> {
         return totalCount;
     }
 
-    private int downloadZip(TransferManager transferManager, File base) throws IOException, InterruptedException {
-        File archive = File.createTempFile("upload", "zip");
+    private int downloadArchive(TransferManager transferManager, File base, StorageFormat format) throws IOException, InterruptedException {
 
-        String s3key = pathPrefix + "/archive.zip";
+        File archive = File.createTempFile("upload", "archive");
+        String archiveExt;
+        switch (format) {
+            case ZIP: archiveExt = "zip"; break;
+            case TAR: archiveExt = "tar"; break;
+            default:  throw new RuntimeException("Unsupported archive format: " + format);
+        }
+
+        String s3key = pathPrefix + "/archive." + archiveExt;
         transferManager.download(bucketName, s3key, archive).waitForCompletion();
 
-        new FilePath(archive).unzip(new FilePath(base));
+        FilePath archiveFilePath = new FilePath(archive);
+        FilePath baseFilePath = new FilePath(base);
+        switch (format) {
+            case ZIP: archiveFilePath.unzip(baseFilePath); break;
+            case TAR: archiveFilePath.untar(baseFilePath, FilePath.TarCompression.NONE); break;
+        }
+
         if (!archive.delete()) {
             LOG.warning("Unable to delete temporary file " + archive);
         }

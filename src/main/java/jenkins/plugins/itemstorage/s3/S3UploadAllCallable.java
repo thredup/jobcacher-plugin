@@ -160,6 +160,13 @@ public class S3UploadAllCallable extends S3BaseUploadCallable<Integer> {
         Uploads uploads = new Uploads();
 
         String s3key = pathPrefix + "/archive." + archiveExt;
+
+        logger.info(">>> Querying S3 for existing archive at s3://" + bucketName + "/" + s3key);
+        if(lookupExistingCacheEntries(transferManager.getAmazonS3Client()).containsKey(s3key)) {
+            logger.info(">>> Actual cache exists! Skipping upload!");
+            return 0;
+        }
+
         ObjectMetadata metadata = buildMetadata(archive);
         Destination destination = new Destination(bucketName, s3key);
 

@@ -53,7 +53,15 @@ public class DependencyCache extends ArbitraryFileCache {
                     String fileExt = FilenameUtils.getExtension(file.getPath());
                     List<String> textTypeExts = Arrays.asList(".json",".lock",".xml");
                     boolean isBin =
-                            (fileType == null) || !fileType.startsWith("text") || !textTypeExts.contains(fileExt);
+                            (fileType == null) || !(textTypeExts.contains(fileExt) || fileType.startsWith("text"));
+                    logger.fine(">>> Key file type detected as "+(isBin?"binary":"text"));
+                    //TODO remove excess logging below
+                    if (!isBin) {
+                        String txt = Files.lines(file.toPath()).collect(Collectors.joining("\n"));
+                        logger.finest(">>> Key file text:\n" + txt);
+                        logger.fine(">>> Text digest: " + Util.getDigestOf(txt));
+                    }
+                    logger.fine(">>> Bin digest" + Util.getDigestOf(file));
                     return isBin ?
                             Util.getDigestOf(file) :
                             Util.getDigestOf(Files.lines(file.toPath()).collect(Collectors.joining("\n")));

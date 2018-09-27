@@ -50,21 +50,23 @@ public class DependencyCache extends ArbitraryFileCache {
                 public String invoke(File file, VirtualChannel channel) throws IOException, InterruptedException {
                     Path pathToFile = file.toPath();
                     String fileType = Files.probeContentType(pathToFile);
+                    if (fileType==null) fileType = "unknown";
                     String fileExt = FilenameUtils.getExtension(file.getPath());
-                    List<String> textTypeExts = Arrays.asList(".json",".lock",".xml");
-                    boolean isBin =
-                            (fileType == null) || !(textTypeExts.contains(fileExt) || fileType.startsWith("text"));
-                    logger.fine(">>> Key file type detected as "+(isBin?"binary":"text"));
+                    List<String> textTypeExts = Arrays.asList("json","lock","xml","yml","yaml","txt");
+                    boolean isText = textTypeExts.contains(fileExt) || fileType.startsWith("text");
+                    logger.fine(">>> Key file type detected as "+(isText?"text":"binary"));
                     //TODO remove excess logging below
-                    if (!isBin) {
-                        String txt = Files.lines(file.toPath()).collect(Collectors.joining("\n"));
-                        logger.finest(">>> Key file text:\n" + txt);
-                        logger.fine(">>> Text digest: " + Util.getDigestOf(txt));
+                    if (isText) {
+                        logger.finest(">>> Key file contains" + Files.lines(file.toPath()).count() + " lines");
+                        logger.fine(">>> Text digest: " +
+                            Util.getDigestOf(Files.lines(file.toPath()).collect(Collectors.joining("\n"))));
                     }
-                    logger.fine(">>> Bin digest" + Util.getDigestOf(file));
-                    return isBin ?
-                            Util.getDigestOf(file) :
-                            Util.getDigestOf(Files.lines(file.toPath()).collect(Collectors.joining("\n")));
+                    logger.fine(">>> Key file params{Path: "+pathToFile+","+
+                                "Detected type: "+fileType+",Extension: "+fileExt+"}");
+                    logger.fine(">>> Bin digest: " + Util.getDigestOf(file));
+                    return isText ?
+                            Util.getDigestOf(Files.lines(file.toPath()).collect(Collectors.joining("\n"))) :
+                            Util.getDigestOf(file);
                 }
             }
         );

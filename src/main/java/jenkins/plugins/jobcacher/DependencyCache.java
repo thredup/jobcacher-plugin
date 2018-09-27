@@ -27,6 +27,7 @@ public class DependencyCache extends ArbitraryFileCache {
     private static final Logger logger = Logger.getLogger(DependencyCache.class.getName());
 
     private final String dependencyDescriptor;
+    private String dependencyDigest = null;
 
     @DataBoundConstructor
     public DependencyCache(String path, String includes, String excludes, String dependencyDescriptor) {
@@ -43,33 +44,9 @@ public class DependencyCache extends ArbitraryFileCache {
         }
 
         FilePath dependencyDescriptorFile = workspace.child(dependencyDescriptor);
-        logger.info(">>> Going to compute dependency descriptor digest for " + dependencyDescriptorFile);
-        String dependencyDigest = dependencyDescriptorFile.act(
-            new SlaveToMasterFileCallable<String>() {
-                @Override
-                public String invoke(File file, VirtualChannel channel) throws IOException, InterruptedException {
-                    Path pathToFile = file.toPath();
-                    String fileType = Files.probeContentType(pathToFile);
-                    if (fileType==null) fileType = "unknown";
-                    String fileExt = FilenameUtils.getExtension(file.getPath());
-                    List<String> textTypeExts = Arrays.asList("json","lock","xml","yml","yaml","txt");
-                    boolean isText = textTypeExts.contains(fileExt) || fileType.startsWith("text");
-                    logger.fine(">>> Key file type detected as "+(isText?"text":"binary"));
-                    //TODO remove excess logging below
-                    if (isText) {
-                        logger.finest(">>> Key file contains" + Files.lines(file.toPath()).count() + " lines");
-                        logger.fine(">>> Text digest: " +
-                            Util.getDigestOf(Files.lines(file.toPath()).collect(Collectors.joining("\n"))));
-                    }
-                    logger.fine(">>> Key file params{Path: "+pathToFile+","+
-                                "Detected type: "+fileType+",Extension: "+fileExt+"}");
-                    logger.fine(">>> Bin digest: " + Util.getDigestOf(file));
-                    return isText ?
-                            Util.getDigestOf(Files.lines(file.toPath()).collect(Collectors.joining("\n"))) :
-                            Util.getDigestOf(file);
-                }
-            }
-        );
+        logger.info(">>> Get available or compute dependency descriptor digest for " + dependencyDescriptorFile);
+        if (dependencyDigest == null)
+            dependencyDigest = dependencyDescriptorFile.digest();
         logger.info(">>> Digest is " + dependencyDigest);
         return parentCachePath.child(dependencyDigest);
     }

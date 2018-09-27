@@ -164,20 +164,19 @@ public class S3UploadAllCallable extends S3BaseUploadCallable<Integer> {
         logger.info(">>> Querying S3 for existing archive at s3://" + bucketName + "/" + s3key);
         if(lookupExistingCacheEntries(transferManager.getAmazonS3Client()).containsKey(s3key)) {
             logger.info(">>> Actual cache exists! Skipping upload!");
-            return 0;
+        } else {
+            ObjectMetadata metadata = buildMetadata(archive);
+            Destination destination = new Destination(bucketName, s3key);
+
+            logger.fine(">>> Uploading to: " + destination);
+
+            uploads.startUploading(transferManager,
+                    archive,
+                    IOUtils.toBufferedInputStream(FileUtils.openInputStream(archive)),
+                    destination,
+                    metadata);
+            waitForUploads(new AtomicInteger(), uploads);
         }
-
-        ObjectMetadata metadata = buildMetadata(archive);
-        Destination destination = new Destination(bucketName, s3key);
-
-        logger.fine(">>> " + destination);
-
-        uploads.startUploading(transferManager,
-                               archive,
-                               IOUtils.toBufferedInputStream(FileUtils.openInputStream(archive)),
-                               destination,
-                               metadata);
-        waitForUploads(new AtomicInteger(), uploads);
 
         if (!archive.delete()) {
             logger.warning("Unable to delete temporary file " + archive);

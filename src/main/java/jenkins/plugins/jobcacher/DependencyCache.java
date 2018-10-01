@@ -2,24 +2,14 @@ package jenkins.plugins.jobcacher;
 
 import hudson.Extension;
 import hudson.FilePath;
-import hudson.Util;
-import hudson.remoting.VirtualChannel;
-import jenkins.SlaveToMasterFileCallable;
 import jenkins.plugins.itemstorage.ObjectPath;
-import org.apache.commons.io.FilenameUtils;
 import org.jenkinsci.Symbol;
 import org.kohsuke.stapler.DataBoundConstructor;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.Arrays;
-import java.util.List;
 import java.util.logging.Logger;
-import java.util.stream.Collectors;
 
 @SuppressWarnings("unused")
 public class DependencyCache extends ArbitraryFileCache {

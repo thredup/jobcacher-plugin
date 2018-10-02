@@ -17,6 +17,7 @@ public class DependencyCache extends ArbitraryFileCache {
     private static final Logger logger = Logger.getLogger(DependencyCache.class.getName());
 
     private final String dependencyDescriptor;
+    private String dependencyDigest = null;
 
     @DataBoundConstructor
     public DependencyCache(String path, String includes, String excludes, String dependencyDescriptor) {
@@ -33,8 +34,9 @@ public class DependencyCache extends ArbitraryFileCache {
         }
 
         FilePath dependencyDescriptorFile = workspace.child(dependencyDescriptor);
-        logger.info(">>> Going to compute dependency descriptor digest for " + dependencyDescriptorFile);
-        String dependencyDigest = dependencyDescriptorFile.digest();
+        logger.info(">>> Get available or compute dependency descriptor digest for " + dependencyDescriptorFile);
+        if (dependencyDigest == null)
+            dependencyDigest = dependencyDescriptorFile.digest();
         logger.info(">>> Digest is " + dependencyDigest);
         return parentCachePath.child(dependencyDigest);
     }

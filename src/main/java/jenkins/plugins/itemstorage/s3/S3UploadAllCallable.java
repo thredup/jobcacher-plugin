@@ -37,13 +37,12 @@ import jenkins.plugins.itemstorage.StorageFormat;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.OutputStream;
+import java.io.*;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 /**
  * Created by hayep on 12/2/2016.
@@ -69,7 +68,10 @@ public class S3UploadAllCallable extends S3BaseUploadCallable<Integer> {
                                String storageClass,
                                boolean useServerSideEncryption) {
         super(clientHelper, userMetadata, storageClass, useServerSideEncryption);
-        logger.info(">>> new S3UploadAllCallable()");
+        logger.info(">>> new S3UploadAllCallable{bucketName="+bucketName+
+                        ",pathPrefix="+pathPrefix+
+                        ",storageFormat="+storageFormat+"}");
+
         this.bucketName = bucketName;
         this.pathPrefix = pathPrefix;
         this.storageFormat = storageFormat;
@@ -84,6 +86,7 @@ public class S3UploadAllCallable extends S3BaseUploadCallable<Integer> {
     public Integer invoke(final TransferManager transferManager, File base, VirtualChannel channel) throws IOException,
             InterruptedException {
         logger.info(">>> invoke()");
+
         if(!base.exists()) {
             logger.warning(">>> Nothing to cache at " + base.getPath());
             return 0;
@@ -159,25 +162,36 @@ public class S3UploadAllCallable extends S3BaseUploadCallable<Integer> {
 
         Uploads uploads = new Uploads();
 
-        String s3key = pathPrefix + "/archive." + archiveExt;
-        ObjectMetadata metadata = buildMetadata(archive);
-        Destination destination = new Destination(bucketName, s3key);
+        String s3KeyToUpload = pathPrefix + "/archive." + archiveExt;
+        logger.finest(">>> S3 archive key to upload: " + s3KeyToUpload);
 
-        logger.fine(">>> " + destination);
+        logger.info(">>> Querying S3 for existing archive at s3://" + bucketName + "/" + s3KeyToUpload);
+        Map<String,S3ObjectSummary> existingArchiveSummaries =
+                lookupExistingCacheEntries(transferManager.getAmazonS3Client());
+        logger.finest(">>> S3 existing archive keys found: " +
+                existingArchiveSummaries.keySet().stream().collect(Collectors.joining(",")));
 
-        uploads.startUploading(transferManager,
-                               archive,
-                               IOUtils.toBufferedInputStream(FileUtils.openInputStream(archive)),
-                               destination,
-                               metadata);
-        waitForUploads(new AtomicInteger(), uploads);
+        if(existingArchiveSummaries.containsKey(s3KeyToUpload)) {
+            logger.info(">>> Actual cache exists! Skipping upload!");
+        } else {
+            ObjectMetadata metadata = buildMetadata(archive);
+            Destination destination = new Destination(bucketName, s3KeyToUpload);
+
+            logger.fine(">>> Uploading to: " + destination);
+
+            uploads.startUploading(transferManager,
+                    archive,
+                    IOUtils.toBufferedInputStream(FileUtils.openInputStream(archive)),
+                    destination,
+                    metadata);
+            waitForUploads(new AtomicInteger(), uploads);
+        }
 
         if (!archive.delete()) {
             logger.warning("Unable to delete temporary file " + archive);
         }
 
-        // TODO: count matched files
-        return 0;
+        return uploads.count();
     }
 
     private Map<String,S3ObjectSummary> lookupExistingCacheEntries(AmazonS3 s3) {

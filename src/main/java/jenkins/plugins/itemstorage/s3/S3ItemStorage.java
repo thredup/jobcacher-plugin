@@ -96,8 +96,8 @@ public class S3ItemStorage extends ItemStorage<S3ObjectPath> {
     @Override
     public S3ObjectPath getObjectPath(Item item, String path) {
         S3Profile profile = new S3Profile(lookupCredentials(), 5, 5L);
-
-        return new S3ObjectPath(profile, bucketName, region, storageFormat, item.getFullName(), path);
+        //TODO: handle path per job via separate option.
+        return new S3ObjectPath(profile, bucketName, region, storageFormat, "common", path);
     }
 
     @Override
